@@ -10,10 +10,11 @@ var testWrites = []struct {
   out string
 }{
   {[]Document{},
-    // HDR TERM DOC-TERM
+    // Header | End of Docs
     "searchme\x00\x00"}, // terminator + doc terminator
   {[]Document{{"path", "content"}},
-    "searchme\x00path\x00\x00content\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"}, // terminator + doc terminator
+    // Header | Doc paths + Terminator | term + terminator + doc id (0)
+    "searchme\x00path\x00\x00content\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"},
 }
 
 func TestWrite(t *testing.T) {
