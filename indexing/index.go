@@ -1,9 +1,14 @@
 package indexing
 
 import (
-	"net/mail"
-	"os"
+	"bufio"
+	"encoding/binary"
+	"io"
 	"strings"
+)
+
+const (
+  magic = "searchme"
 )
 
 type Index struct {
@@ -13,35 +18,21 @@ type Index struct {
 	postings    map[string][]int64
 }
 
-func NewIndex() Index {
+func NewIndex() *Index {
 	var index Index
 	index.postings = make(map[string][]int64)
 	index.docIdToPath = make(map[int64]string)
 	index.pathToDocId = make(map[string]int64)
-	return index
+	return &index
 }
 
-func (i *Index) Add(path string) error {
-	// TODO(kev): No duplicate adds
-	file, err := os.Open(path)
-
-	if err != nil {
-		return nil
-	}
-
-	defer file.Close()
-	var msg *mail.Message
-	msg, err = mail.ReadMessage(file)
-	if err != nil {
-		return nil
-	}
-
+func (i *Index) Add(doc Document) error {
 	termSet := make(map[string]bool)
-	for _, term := range Tokenize(msg.Body) {
+	for _, term := range TokenizeString(doc.Content) {
 		termSet[term] = true
 	}
 
-	docId := i.DocId(path)
+	docId := i.DocId(doc.Path)
 
 	for term, _ := range termSet {
 		i.postings[term] = append(i.postings[term], docId)
@@ -71,4 +62,44 @@ func (index *Index) TermPaths(term string) []string {
 		results[i] = index.docIdToPath[docId]
 	}
 	return results
+}
+
+func (index *Index) Write(w io.Writer) {
+  // List of files, null terminated. Doc ids correspond to index. Ends with an empty filename. 
+  io.WriteString(w, magic + "\x00")
+  for i := int64(0); i < index.DocCounter; i++ {
+    io.WriteString(w, index.docIdToPath[i] + "\x00")
+  }
+  io.WriteString(w, "\x00")
+
+  for term, docIds := range index.postings {
+    // TERM \x00 64bit doc ids until \x00
+    io.WriteString(w, term)
+    io.WriteString(w, "\x00")
+    for _, id := range docIds {
+      binary.Write(w, binary.BigEndian, id)
+      io.WriteString(w, "\x00")
+    }
+  }
+}
+
+func Load(reader io.Reader) (*Index, error) {
+  index := NewIndex()
+  r := bufio.NewReader(reader)
+  magic, err := r.ReadBytes('\x00')
+  if err != nil {
+    return nil, err
+  }
+  if string(magic) != "searchme\x00" {
+    panic("Bad format. Magic bytes not detected.")
+  }
+  var name []byte;
+  for i := int64(0); len(name) != 1; name, err = r.ReadBytes('\x00') {
+    pth := string(name[:len(name) - 2])
+    index.docIdToPath[i] = pth // skip \x00
+    index.pathToDocId[pth] = i // skip \x00
+    i++
+  }
+
+  return index, nil
 }

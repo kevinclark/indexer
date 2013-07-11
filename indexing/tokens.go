@@ -11,7 +11,11 @@ func Tokenize(r io.Reader) []string {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(r)
 
-	fields := strings.Fields(buf.String())
+  return TokenizeString(buf.String())
+}
+
+func TokenizeString(s string) []string {
+	fields := strings.Fields(s)
 	var filtered []string
 
 	for _, field := range fields {
