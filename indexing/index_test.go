@@ -18,7 +18,7 @@ var testWrites = []struct {
 }
 
 func TestWrite(t *testing.T) {
-  for _, testCase := range testWrites {
+  for testNum, testCase := range testWrites {
     i := NewIndex()
     buf := new(bytes.Buffer)
     for _, doc := range testCase.docs {
@@ -28,7 +28,7 @@ func TestWrite(t *testing.T) {
 
     result := string(buf.Bytes())
     if testCase.out != result {
-      t.Fatalf("Expected: %q Actual %q", testCase.out, result)
+      t.Fatalf("%d. Expected: %q Actual %q", testNum, testCase.out, result)
     }
   }
 }
