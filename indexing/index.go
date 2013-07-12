@@ -3,6 +3,8 @@ package indexing
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -12,21 +14,21 @@ const (
 )
 
 type Index struct {
-	DocCounter  int64
-	docIdToPath map[int64]string
-	pathToDocId map[string]int64
-	postings    map[string][]int64
+	DocCounter  uint64
+	docIdToPath map[uint64]string
+	pathToDocId map[string]uint64
+	postings    map[string][]uint64
 }
 
 func NewIndex() *Index {
 	var index Index
-	index.postings = make(map[string][]int64)
-	index.docIdToPath = make(map[int64]string)
-	index.pathToDocId = make(map[string]int64)
+	index.postings = make(map[string][]uint64)
+	index.docIdToPath = make(map[uint64]string)
+	index.pathToDocId = make(map[string]uint64)
 	return &index
 }
 
-func (i *Index) Add(doc Document) error {
+func (i *Index) Add(doc *Document) error {
 	termSet := make(map[string]bool)
 	for _, term := range TokenizeString(doc.Content) {
 		termSet[term] = true
@@ -41,7 +43,7 @@ func (i *Index) Add(doc Document) error {
 	return nil
 }
 
-func (i *Index) DocId(path string) int64 {
+func (i *Index) DocId(path string) uint64 {
 	docId, contains := i.pathToDocId[path]
 	if !contains {
 		docId = i.DocCounter
@@ -67,38 +69,60 @@ func (index *Index) TermPaths(term string) []string {
 func (index *Index) Write(w io.Writer) {
   // List of files, null terminated. Doc ids correspond to index. Ends with an empty filename. 
   io.WriteString(w, magic + "\x00")
-  for i := int64(0); i < index.DocCounter; i++ {
+  for i := uint64(0); i < index.DocCounter; i++ {
     io.WriteString(w, index.docIdToPath[i] + "\x00")
   }
   io.WriteString(w, "\x00")
 
   for term, docIds := range index.postings {
-    // TERM \x00 64bit doc ids until \x00
+    // TERM \x00 32-bit-number-of-docs 64bit doc ids until
     io.WriteString(w, term)
     io.WriteString(w, "\x00")
+    binary.Write(w, binary.BigEndian, uint32(len(docIds)))
     for _, id := range docIds {
       binary.Write(w, binary.BigEndian, id)
-      io.WriteString(w, "\x00")
     }
   }
 }
 
-func Load(reader io.Reader) (*Index, error) {
+func stripNull(b []byte) string {
+  return string(b[:len(b) - 1])
+}
+
+func LoadIndex(reader io.Reader) (*Index, error) {
   index := NewIndex()
   r := bufio.NewReader(reader)
-  magic, err := r.ReadBytes('\x00')
-  if err != nil {
-    return nil, err
+
+  magic, _ := r.ReadBytes('\x00')
+  if stripNull(magic) != "searchme" {
+    return nil, errors.New(fmt.Sprintf("Bad format. Magic bytes not detected: %q", magic))
   }
-  if string(magic) != "searchme\x00" {
-    panic("Bad format. Magic bytes not detected.")
-  }
-  var name []byte;
-  for i := int64(0); len(name) != 1; name, err = r.ReadBytes('\x00') {
-    pth := string(name[:len(name) - 2])
-    index.docIdToPath[i] = pth // skip \x00
-    index.pathToDocId[pth] = i // skip \x00
+
+  // Read docs
+  var i uint64
+  for p, _ := r.ReadBytes('\x00'); len(p) >= 2; p, _ = r.ReadBytes('\x00') {
+    path := stripNull(p)
+    index.docIdToPath[i] = path // skip \x00
+    index.pathToDocId[path] = i // skip \x00
     i++
+  }
+
+  // Read terms
+  for {
+    t, err := r.ReadBytes('\x00')
+    if err != nil {
+      return index, nil
+    }
+    term := stripNull(t)
+    var size uint32
+    binary.Read(r, binary.BigEndian, &size)
+    docs := make([]uint64, size)
+    for j := uint32(0); j < size; j++ {
+      var docId uint64
+      binary.Read(r, binary.BigEndian, &docId)
+      docs[j] = docId
+    }
+    index.postings[term] = docs
   }
 
   return index, nil
