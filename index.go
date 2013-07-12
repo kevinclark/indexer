@@ -27,7 +27,7 @@ func query(path string) {
 		var query string
 		_, err := fmt.Scanf("%s", &query)
 		if err != nil {
-			panic("crap")
+			panic(err)
 		}
 		for _, path := range index.TermPaths(query) {
 			fmt.Println("Found in: ", path)
