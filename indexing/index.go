@@ -31,9 +31,9 @@ func NewIndex() *Index {
 }
 
 func (i *Index) Add(doc *Document) error {
-	termSet := make(map[string]bool)
+	termSet := make(map[string]struct{})
 	for _, term := range TokenizeString(doc.Content) {
-		termSet[term] = true
+		termSet[term] = struct{}{}
 	}
 
 	docId := i.AssignDocId(doc.Path)
