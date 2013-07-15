@@ -102,10 +102,11 @@ func LoadIndex(reader io.Reader) (*Index, error) {
 
 	// Read docs
 	var i DocId
+  // TODO(kev): Don't ignore errors
 	for p, _ := r.ReadBytes('\x00'); len(p) >= 2; p, _ = r.ReadBytes('\x00') {
 		path := stripNull(p)
-		index.docIdToPath[i] = path // skip \x00
-		index.pathToDocId[path] = i // skip \x00
+		index.docIdToPath[i] = path
+		index.pathToDocId[path] = i
 		i++
 	}
 
