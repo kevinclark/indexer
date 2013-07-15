@@ -9,18 +9,17 @@ import (
 )
 
 func query(path string) {
-  file, err := os.Open(path)
-  if err != nil {
-    fmt.Println("Unable to load index: ", err)
-  }
-  defer file.Close()
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println("Unable to load index: ", err)
+	}
+	defer file.Close()
 
-  index, err := indexing.LoadIndex(file)
+	index, err := indexing.LoadIndex(file)
 
-  if err != nil {
-    fmt.Println("Unable to load index: ", err)
-  }
-  
+	if err != nil {
+		fmt.Println("Unable to load index: ", err)
+	}
 
 	for {
 		fmt.Println("Query?")
@@ -36,7 +35,7 @@ func query(path string) {
 }
 
 func write(path string, outPath string) {
-  index := indexing.NewIndex()
+	index := indexing.NewIndex()
 	filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -46,23 +45,23 @@ func write(path string, outPath string) {
 			return nil
 		}
 
-    doc, err := indexing.LoadFromMail(path)
-    if err != nil {
-      fmt.Println("Unable to load mail: ", err)
-      return nil
-    }
+		doc, err := indexing.LoadFromMail(path)
+		if err != nil {
+			fmt.Println("Unable to load mail: ", err)
+			return nil
+		}
 		index.Add(doc)
 
 		return nil
 	})
 
 	fmt.Println("Processed ", index.DocCounter, " files")
-  file, err := os.Create(outPath)
-  if err != nil {
-    fmt.Println("Unable to write index: ", err)
-  }
-  defer file.Close()
-  index.Write(file)
+	file, err := os.Create(outPath)
+	if err != nil {
+		fmt.Println("Unable to write index: ", err)
+	}
+	defer file.Close()
+	index.Write(file)
 }
 
 // Walk the given file path, adding emails to the index
@@ -70,12 +69,12 @@ func main() {
 	// The path we're going to index comes from the command line
 	flag.Parse()
 
-  args := flag.Args()
+	args := flag.Args()
 
-  switch args[0] {
-  case "index":
-    write(args[1], args[2])
-  case "query":
-    query(args[1])
-  }
+	switch args[0] {
+	case "index":
+		write(args[1], args[2])
+	case "query":
+		query(args[1])
+	}
 }

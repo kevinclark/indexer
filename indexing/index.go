@@ -10,7 +10,7 @@ import (
 )
 
 const (
-  magic = "searchme"
+	magic = "searchme"
 )
 
 type DocId uint32
@@ -69,63 +69,63 @@ func (index *Index) TermPaths(term string) []string {
 }
 
 func (index *Index) Write(w io.Writer) {
-  // List of files, null terminated. Doc ids correspond to index. Ends with an empty filename. 
-  io.WriteString(w, magic + "\x00")
-  for i := DocId(0); i < index.DocCounter; i++ {
-    io.WriteString(w, index.docIdToPath[i] + "\x00")
-  }
-  io.WriteString(w, "\x00")
+	// List of files, null terminated. Doc ids correspond to index. Ends with an empty filename.
+	io.WriteString(w, magic+"\x00")
+	for i := DocId(0); i < index.DocCounter; i++ {
+		io.WriteString(w, index.docIdToPath[i]+"\x00")
+	}
+	io.WriteString(w, "\x00")
 
-  for term, docIds := range index.postings {
-    // TERM \x00 32-bit-number-of-docs 64bit doc ids until
-    io.WriteString(w, term)
-    io.WriteString(w, "\x00")
-    binary.Write(w, binary.BigEndian, uint32(len(docIds)))
-    for _, id := range docIds {
-      binary.Write(w, binary.BigEndian, id)
-    }
-  }
+	for term, docIds := range index.postings {
+		// TERM \x00 32-bit-number-of-docs 64bit doc ids until
+		io.WriteString(w, term)
+		io.WriteString(w, "\x00")
+		binary.Write(w, binary.BigEndian, uint32(len(docIds)))
+		for _, id := range docIds {
+			binary.Write(w, binary.BigEndian, id)
+		}
+	}
 }
 
 func stripNull(b []byte) string {
-  return string(b[:len(b) - 1])
+	return string(b[:len(b)-1])
 }
 
 func LoadIndex(reader io.Reader) (*Index, error) {
-  index := NewIndex()
-  r := bufio.NewReader(reader)
+	index := NewIndex()
+	r := bufio.NewReader(reader)
 
-  magic, _ := r.ReadBytes('\x00')
-  if stripNull(magic) != "searchme" {
-    return nil, errors.New(fmt.Sprintf("Bad format. Magic bytes not detected: %q", magic))
-  }
+	magic, _ := r.ReadBytes('\x00')
+	if stripNull(magic) != "searchme" {
+		return nil, errors.New(fmt.Sprintf("Bad format. Magic bytes not detected: %q", magic))
+	}
 
-  // Read docs
-  var i DocId
-  for p, _ := r.ReadBytes('\x00'); len(p) >= 2; p, _ = r.ReadBytes('\x00') {
-    path := stripNull(p)
-    index.docIdToPath[i] = path // skip \x00
-    index.pathToDocId[path] = i // skip \x00
-    i++
-  }
+	// Read docs
+	var i DocId
+	for p, _ := r.ReadBytes('\x00'); len(p) >= 2; p, _ = r.ReadBytes('\x00') {
+		path := stripNull(p)
+		index.docIdToPath[i] = path // skip \x00
+		index.pathToDocId[path] = i // skip \x00
+		i++
+	}
 
-  // Read terms
-  for {
-    t, err := r.ReadBytes('\x00')
-    if err != nil {
-      return index, nil
-    }
-    term := stripNull(t)
-    var size uint32
-    binary.Read(r, binary.BigEndian, &size)
-    docs := make([]DocId, size)
-    for j := uint32(0); j < size; j++ {
-      var docId DocId
-      binary.Read(r, binary.BigEndian, &docId)
-      docs[j] = docId
-    }
-    index.postings[term] = docs
-  }
+	// Read terms
+	for {
+		t, err := r.ReadBytes('\x00')
+		if err != nil {
+			return index, nil
+		}
+		term := stripNull(t)
+		var size uint32
+		binary.Read(r, binary.BigEndian, &size)
+		docs := make([]DocId, size)
+		for j := uint32(0); j < size; j++ {
+			var docId DocId
+			binary.Read(r, binary.BigEndian, &docId)
+			docs[j] = docId
+		}
+		index.postings[term] = docs
+	}
 
-  return index, nil
+	return index, nil
 }

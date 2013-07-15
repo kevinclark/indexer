@@ -11,7 +11,7 @@ func Tokenize(r io.Reader) []string {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(r)
 
-  return TokenizeString(buf.String())
+	return TokenizeString(buf.String())
 }
 
 func TokenizeString(s string) []string {
